@@ -1,20 +1,11 @@
-FROM microsoft/windowsservercore
-MAINTAINER Jonathan Muller <jmuller@gsx.com>
-
-ENV erlang_download_url="http://erlang.org/download/otp_win64_20.3.exe" \
-    ERLANG_HOME=c:\\erlang
+FROM microsoft/windowsservercore:1709 as root
+LABEL maintainer="muller.john@gmail.com"
 
 ENV RMQ_VERSION="3.7.4" \
     rabbit_download_url="https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.7.4/rabbitmq-server-windows-3.7.4.zip"
 
 # setup powershell options for RUN commands
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-
-# download and install erlang using silent install option, and remove installer when done
-RUN [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    Invoke-WebRequest -Uri $env:erlang_download_url -OutFile erlang_install.exe ; \
-    Start-Process -Wait -FilePath .\erlang_install.exe -ArgumentList /S, /D=$env:ERLANG_HOME ; \
-    Remove-Item -Force erlang_install.exe
 
 # download and extract rabbitmq, and remove zip file when done
 RUN [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
@@ -23,14 +14,31 @@ RUN [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tl
     Remove-Item -Force rabbitmq.zip; \
     Rename-Item c:\rabbitmq_server-$env:RMQ_VERSION c:\rabbitmq
 
+FROM gsxsolutions/erlang-otp-nano:20.3
+LABEL maintainer="muller.john@gmail.com"
+
+COPY --from=root c:\\rabbitmq c:\\rabbitmq
+
 # tell rabbitmq where to find our custom config file
 ENV RABBITMQ_CONFIG_FILE "c:\rabbitmq"
+
 RUN ["cmd", "/c", "echo [{rabbit, [{loopback_users, []}]}].> c:\\rabbitmq.config"]
 
-RUN mkdir C:\\Users\\ContainerAdministrator\\AppData\\Roaming\\RabbitMQ
+RUN mkdir c:\Users\%USERNAME%\\AppData\\Roaming\\RabbitMQ
 
 # enable managment plugin
 RUN c:\rabbitmq\sbin\rabbitmq-plugins.bat enable rabbitmq_management --offline
 
+# Ports
+# 4369: epmd, a peer discovery service used by RabbitMQ nodes and CLI tools
+# 5672: used by AMQP 0-9-1 and 1.0 clients without TLS
+# 5671: used by AMQP 0-9-1 and 1.0 clients with TLS
+# 25672: used by Erlang distribution for inter-node and CLI tools communication and is allocated from a dynamic range (limited to a single port by default, computed as AMQP port + 20000).
+# 15672: HTTP API clients and rabbitmqadmin (only if the management plugin is enabled)
+EXPOSE 4369 5671 5672 25672 15672
+
+VOLUME c:\\rmq-data
+
+
 # run server when container starts - container will shutdown when this process ends
-CMD "c:\rabbitmq\sbin\rabbitmq-server.bat"
+CMD c:\\rabbitmq\\sbin\\rabbitmq-server.bat
