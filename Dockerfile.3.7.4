@@ -20,14 +20,16 @@ LABEL maintainer="muller.john@gmail.com"
 COPY --from=root c:\\rabbitmq c:\\rabbitmq
 
 # tell rabbitmq where to find our custom config file
-ENV RABBITMQ_CONFIG_FILE "c:\rabbitmq"
+ENV RABBITMQ_CONFIG_FILE="c:\rabbitmq" \
+    RABBITMQ_BASE="c:\\rmq-data"
+
+VOLUME ${RABBITMQ_BASE}
+
+COPY start.cmd c:\\scripts\\start.cmd
 
 RUN ["cmd", "/c", "echo [{rabbit, [{loopback_users, []}]}].> c:\\rabbitmq.config"]
 
 RUN mkdir c:\Users\%USERNAME%\\AppData\\Roaming\\RabbitMQ
-
-# enable managment plugin
-RUN c:\rabbitmq\sbin\rabbitmq-plugins.bat enable rabbitmq_management --offline
 
 # Ports
 # 4369: epmd, a peer discovery service used by RabbitMQ nodes and CLI tools
@@ -37,8 +39,5 @@ RUN c:\rabbitmq\sbin\rabbitmq-plugins.bat enable rabbitmq_management --offline
 # 15672: HTTP API clients and rabbitmqadmin (only if the management plugin is enabled)
 EXPOSE 4369 5671 5672 25672 15672
 
-VOLUME c:\\rmq-data
-
-
 # run server when container starts - container will shutdown when this process ends
-CMD c:\\rabbitmq\\sbin\\rabbitmq-server.bat
+CMD Scripts\\start.cmd

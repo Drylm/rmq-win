@@ -20,7 +20,12 @@ COPY --from=root c:\\rabbitmq c:\\rabbitmq
 #COPY --from=root c:\\Windows\\.erlang.cookie c:\\Windows\\.erlang.cookie
 
 # tell rabbitmq where to find our custom config file
-ENV RABBITMQ_CONFIG_FILE "c:\rabbitmq"
+ENV RABBITMQ_CONFIG_FILE "c:\rabbitmq" \
+    RABBITMQ_BASE="c:\\rmq-data"
+
+VOLUME ${RABBITMQ_BASE}
+
+COPY start.cmd c:\\scripts\\start.cmd
 
 RUN ["cmd", "/c", "echo [{rabbit, [{loopback_users, []}]}].> c:\\rabbitmq.config"]
 
@@ -29,10 +34,13 @@ RUN mkdir c:\Users\%USERNAME%\\AppData\\Roaming\\RabbitMQ
 # enable managment plugin
 RUN c:\rabbitmq\sbin\rabbitmq-plugins.bat enable rabbitmq_management --offline
 
+# Ports
+# 4369: epmd, a peer discovery service used by RabbitMQ nodes and CLI tools
+# 5672: used by AMQP 0-9-1 and 1.0 clients without TLS
+# 5671: used by AMQP 0-9-1 and 1.0 clients with TLS
+# 25672: used by Erlang distribution for inter-node and CLI tools communication and is allocated from a dynamic range (limited to a single port by default, computed as AMQP port + 20000).
+# 15672: HTTP API clients and rabbitmqadmin (only if the management plugin is enabled)
 EXPOSE 4369 5671 5672 25672 15672
 
-VOLUME c:\\rmq-data
-
-
 # run server when container starts - container will shutdown when this process ends
-CMD c:\\rabbitmq\\sbin\\rabbitmq-server.bat
+CMD Scripts\\start.cmd
