@@ -1,19 +1,20 @@
 FROM microsoft/windowsservercore:1709 as root
 LABEL maintainer="muller.john@gmail.com"
 
-ENV RMQ_VERSION="3.5.4" \
-    rabbit_download_url="https://www.rabbitmq.com/releases/rabbitmq-server/v3.5.4/rabbitmq-server-windows-3.5.4.zip"
+ENV RMQ_VERSION="3.7.5" \
+    rabbit_download_url="https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.7.5/rabbitmq-server-windows-3.7.5.zip"
 
 # setup powershell options for RUN commands
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 # download and extract rabbitmq, and remove zip file when done
-RUN Invoke-WebRequest -Uri $env:rabbit_download_url -OutFile rabbitmq.zip ; \
-        Expand-Archive -Path .\rabbitmq.zip -DestinationPath "c:\\" ; \
-        Remove-Item -Force rabbitmq.zip; \
-        Rename-Item c:\rabbitmq_server-$env:RMQ_VERSION c:\rabbitmq
+RUN [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -Uri $env:rabbit_download_url -OutFile rabbitmq.zip ; \
+    Expand-Archive -Path .\rabbitmq.zip -DestinationPath "c:\\" ; \
+    Remove-Item -Force rabbitmq.zip; \
+    Rename-Item c:\rabbitmq_server-$env:RMQ_VERSION c:\rabbitmq
 
-FROM gsxsolutions/erlang-otp-nano:18.0
+FROM gsxsolutions/erlang-otp-nano:20.3
 LABEL maintainer="muller.john@gmail.com"
 
 COPY --from=root c:\\rabbitmq c:\\rabbitmq
